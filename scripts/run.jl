@@ -51,7 +51,7 @@ function toy()
     end
 
     ds = 2 .^ (1:6)
-    methods = [kbr, iwkbr]
+    methods = [kernel_bayes_rule, iw_kernel_bayes_rule]
     n_runs = 50
     errs = map(
         (method) ->

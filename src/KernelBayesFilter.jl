@@ -14,36 +14,51 @@ function median_lengthscale(X)
     return median_lengthscale(X, X)
 end
 
-function kbr_common(U, X, Y; ϵ=0.2)
+function compute_gamma(U, X, KX, ϵ)
     n = size(X)[2]
-    KX = with_lengthscale(SqExponentialKernel(), median_lengthscale(X))
-    KY = with_lengthscale(SqExponentialKernel(), median_lengthscale(Y))
     GX = kernelmatrix(KX, X)
-    GY = kernelmatrix(KY, Y)
     m = mean(kernelmatrix(KX, X, U); dims=2)
-    μ = n * ((GX + n * ϵ * I(n)) \ m)
-    return n, KY, GY, μ
+    γ = n * ((GX + n * ϵ * I(n)) \ m)
+    return γ[:, 1]
 end
 
-function kbr(U, X, Y; ϵ=0.2)
-    n, KY, GY, μ = kbr_common(U, X, Y; ϵ)
-    Λ = Diagonal(μ[:, 1])
-    A = Λ * GY
-    R = A * ((A * A + ϵ * I(n)) \ Λ)
+function kernel_bayes_rule(
+    U,
+    X,
+    Y;
+    ϵ=0.2,
+    KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)),
+    KY=with_lengthscale(SqExponentialKernel(), median_lengthscale(Y)),
+)::Function
+    n = size(X)[2]
+    GY = kernelmatrix(KY, Y)
+    γ = compute_gamma(U, X, KX, ϵ)
+    D = Diagonal(γ)
+    A = D * GY
+    R = A * ((A * A + ϵ * I(n)) \ D)
     # posterior mean
-    f(Y2) = X * R * kernelmatrix(KY, Y, Y2)
+    f(Ytest) = X * R * kernelmatrix(KY, Y, Ytest)
     return f
 end
 
-function iwkbr(U, X, Y; ϵ=0.2)
-    n, KY, GY, μ = kbr_common(U, X, Y; ϵ)
-    D = Diagonal(sqrt.(max.(μ[:, 1], 0.0))) / n
+function iw_kernel_bayes_rule(
+    U,
+    X,
+    Y;
+    ϵ=0.2,
+    KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)),
+    KY=with_lengthscale(SqExponentialKernel(), median_lengthscale(Y)),
+)::Function
+    n = size(X)[2]
+    GY = kernelmatrix(KY, Y)
+    γ = compute_gamma(U, X, KX, ϵ)
+    D = Diagonal(sqrt.(max.(γ, 0.0))) / n
     R = D * ((D * GY * D + ϵ * I(n)) \ D)
     # posterior mean
-    f(Y2) = X * R * kernelmatrix(KY, Y, Y2)
+    f(Ytest) = X * R * kernelmatrix(KY, Y, Ytest)
     return f
 end
 
-export kbr, iwkbr, median_lengthscale
+export median_lengthscale, kernel_bayes_rule, iw_kernel_bayes_rule
 
 end
