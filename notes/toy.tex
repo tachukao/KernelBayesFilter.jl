@@ -1,0 +1,111 @@
+\documentclass[a4paper,11pt]{article}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{amsfonts, amssymb}
+\usepackage{lmodern}
+\usepackage{physics}
+\usepackage{amsthm}
+
+\usepackage[top=3cm,bottom=3cm,left=3cm,right=3cm]{geometry}
+\usepackage{authblk}
+\usepackage[sort]{natbib}
+\usepackage{lineno}
+
+\usepackage{amsmath,amssymb,bm,bbm}
+\usepackage{soul}
+\definecolor{dgreen}{rgb}{0.0,0.6,0}
+\definecolor{dred}{rgb}{0.6,0,0}
+\definecolor{hlcolor}{rgb}{1,1,0.8}
+\definecolor{linkcolor}{HTML}{2171B5}
+\usepackage{xr}
+\usepackage[colorlinks=true,linkcolor=linkcolor,citecolor=dgreen]{hyperref}
+\usepackage[nameinlink]{cleveref}
+\renewcommand\b[1]{\bm{{#1}}}
+\renewcommand\bar[1]{\overline{{#1}}}
+\newcommand\vect[1]{\text{vec}\left ( #1 \right )}
+\newcommand{\xstar}{{x^\star}}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\parindent 0pt
+\parskip 5pt
+\setcounter{MaxMatrixCols}{20}
+
+\title{\bfseries 
+Kernel Bayes' Rule: Toy Example
+}
+\author[1,$\rm @$]{Ta-Chu Kao}
+\affil[1]{Gatsby Computational Neuroscience Unit}
+\affil[$\rm @$]{Correspondence: c.kao@ucl.ac.uk}
+
+\begin{document}
+\maketitle
+
+In this short note, I derive the analytic solution to the problem presented in 5.1 of \citealp{fukumizu2011kernel}.
+
+For random variables $\b{X}, \b{Y} \in \mathbb{R}^d$, we are given the joint distribution $P(\b{X}, \b{Y}) = \mathcal{N} \left ( \b{\mu}, \b{\Sigma} \right )$, where %
+\begin{align}
+    \b{\mu} = 
+    \begin{bmatrix}
+        \b{0}_d\\
+        \b{1}_d\\
+    \end{bmatrix}
+    \quad
+    \text{and}
+    \quad
+    \b{\Sigma} = 
+    \begin{bmatrix}
+            \b{\Sigma}_{XX} & \b{\Sigma}_{XY}\\
+            \b{\Sigma}_{YX} & \b{\Sigma}_{YY}\\
+    \end{bmatrix}.
+\end{align}
+%
+This means we can easily write down the likelihood 
+%
+\begin{equation}
+    P(\b{Y}|\b{X}) = \mathcal{N}
+\left ( 
+    \b{1}_d + \b{\Sigma}_{YX}\b{\Sigma}_{XX}^{-1}\b{X},
+    \b{\Sigma}_{YY} - \b{\Sigma}_{YX}\b{\Sigma}_{XX}^{-1}\b{\Sigma}_{XY}
+\right ).
+\end{equation}
+%
+The aim is to find the posterior mean of $Q(\b{X}|\b{Y})$ with likelihood $P(\b{Y}|\b{X})$ and prior $\Pi(\b{X}) = \mathcal{N}(\b{0}_d, \b{\Sigma}_{XX}/2)$.
+We can easily write down the joint distribution $Q(\b{X}, \b{Y}) = P(\b{Y}|\b{X}) \Pi(\b{X})$ as a multivariate Gaussian distribution given by:
+%
+\begin{equation}
+    Q(\b{X}, \b{Y}) = \mathcal{N}(\b{\mu}_Q, \b{\Sigma}_Q)
+\end{equation}
+%
+where
+%
+\begin{equation}
+    \b{\mu}_Q = 
+    \begin{bmatrix}
+        \b{0}_d\\
+        \b{1}_d
+    \end{bmatrix}
+    \quad
+    \text{and}
+    \quad
+    \b{\Sigma}_Q
+    =
+    \begin{bmatrix}
+        \b{\Sigma}_{XX}/2 & \b{\Sigma}_{XX}^{-1} \b{\Sigma}_{XY}\\
+        \b{\Sigma}_{YX}\b{\Sigma}_{XX}^{-1} & \b{\Sigma}_{YY} - \b{\Sigma}_{YX}\b{\Sigma}_{XX}^{-1}\b{\Sigma}_{XY}/2
+    \end{bmatrix}.
+\end{equation}
+%
+And thus the posterior mean of $Q(\b{X} | \b{Y})$ is given by 
+%
+\begin{equation}
+    \b{\Sigma}_{XX}^{-1}\b{\Sigma}_{XY}\left ( 
+    \b{\Sigma}_{YY} - \b{\Sigma}_{YX}\b{\Sigma}_{XX}^{-1}\b{\Sigma}_{XY}/2   
+    \right )^{-1} \left ( \b{Y} - \b{1}_d \right ).
+\end{equation}
+
+
+
+
+\bibliography{references}
+\bibliographystyle{unsrtnat}
+\end{document}

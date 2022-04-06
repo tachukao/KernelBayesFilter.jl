@@ -3,6 +3,12 @@ uuid = "2a60eb31-f8f0-4078-b95c-0f48238bf074"
 authors = ["Ta-Chu Kao <t<tachu.kao@gmail.com>"]
 version = "0.1.0"
 
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+KernelFunctions = "ec8451be-7e33-11e9-00cf-bbf324bd1392"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+
 [compat]
 julia = "1"
 
