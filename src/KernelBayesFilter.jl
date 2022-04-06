@@ -59,6 +59,6 @@ function iw_kernel_bayes_rule(
     return f
 end
 
-export median_lengthscale, kernel_bayes_rule, iw_kernel_bayes_rule
+export median_lengthscale
 
 end

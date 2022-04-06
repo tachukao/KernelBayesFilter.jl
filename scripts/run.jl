@@ -9,55 +9,58 @@ function mse(x, y)
 end
 
 function toy()
+    """
+        Reproducing Figure 1 in https://arxiv.org/pdf/2202.02474.pdf
+    """
+
     function problem(d)
         n = 2 * d
+
+        # construct distributions
         A = randn(n, n)
         Σ = ((A' * A) / n) + (2.0 * I(n))
         μ = [zeros(d); ones(d)]
         joint = MvNormal(μ, Σ)
         prior = MvNormal(μ[1:d], 0.5 * Σ[1:d, 1:d])
+
+        # build function to compute posterior mean
         Vxx = Σ[1:d, 1:d]
         Vyy = Σ[(d + 1):end, (d + 1):end]
         Vyx = Σ[(d + 1):end, 1:d]
         Z = Vxx \ Vyx'
-        H = Z * inv(Vyy - 0.5 * Vyx * Z)
-        # prec = inv(Σ)
-        # SXY = prec[1:d, (d + 1):end]
-        # SYY = prec[(d + 1):end, (d + 1):end]
-        # B = inv(prior.Σ) + (SXY * (SYY \ SXY'))
-        # H = -B \ SXY
-        f(y) = H * (y .- 1)
+        f(y) = Z * ((Vyy - 0.5 * Vyx * Z) \ (y .- 1.0))
 
-        return joint, prior, f
+        # draw data
+        n_prior_samples = 200
+        n_train_samples = n_prior_samples
+        U = rand(prior, n_prior_samples)
+        D = rand(joint, n_train_samples)
+        X = D[1:d, :]
+        Y = D[(d + 1):end, :]
+        n_test_samples = 1000
+        Dtest = rand(joint, n_test_samples)
+        Ytest = Dtest[(d + 1):end, :] .- 1.0
+        target = f(Ytest)
+
+        return U, X, Y, Ytest, target
     end
 
     function experiment(d, method)
-        k = 200
-        n_samples = k
-        joint, prior, target = problem(d)
-        ϵ = 0.2
-
-        U = rand(prior, k)
-        D = rand(joint, n_samples)
-        X, Y = D[1:d, :], D[(d + 1):end, :]
-
-        n_test_samples = 1000
-        D2 = rand(joint, n_test_samples)
-        Y2 = D2[(d + 1):end, :] .- 1.0
-
-        inferred = method(U, X, Y; ϵ)(Y2)
-        analytic = target(Y2)
-        return mse(inferred, analytic)
+        U, X, Y, Ytest, target = problem(d)
+        inferred = method(U, X, Y; ϵ=0.2)(Ytest)
+        return mse(inferred, target)
     end
 
-    ds = 2 .^ (1:6)
+    dimensionalities = 2 .^ (1:6)
     methods = [kernel_bayes_rule, iw_kernel_bayes_rule]
     n_runs = 50
-    errs = map(
-        (method) ->
-            reduce(hcat, map((x) -> map((d) -> experiment(d, method), ds), 1:n_runs)),
-        methods,
-    )
+
+    function try_method(method)
+        wrapper(d) = experiment(d, method)
+        return reduce(hcat, map((x) -> map(wrapper, dimensionalities), 1:n_runs))
+    end
+
+    errs = map(try_method, methods)
 
     fig = plot(; legend=:topleft)
     scatter!(ds, mean(errs[1]; dims=2); ribbon=std(errs[1]; dims=2), label="original")
