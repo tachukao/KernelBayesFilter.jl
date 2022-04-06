@@ -22,7 +22,7 @@ function compute_gamma(U, X, KX, ϵ)
     return γ[:, 1]
 end
 
-function kernel_bayes_rule(
+function kernel_bayes(
     U,
     X,
     Y;
@@ -41,7 +41,7 @@ function kernel_bayes_rule(
     return f
 end
 
-function iw_kernel_bayes_rule(
+function iw_kernel_bayes(
     U,
     X,
     Y;
@@ -59,6 +59,6 @@ function iw_kernel_bayes_rule(
     return f
 end
 
-export median_lengthscale
+export median_lengthscale, kernel_bayes, iw_kernel_bayes
 
 end

@@ -51,13 +51,13 @@ function toy()
         return mse(inferred, target)
     end
 
-    dimensionalities = 2 .^ (1:6)
-    methods = [kernel_bayes_rule, iw_kernel_bayes_rule]
+    ds = 2 .^ (1:6)
+    methods = [kernel_bayes, iw_kernel_bayes]
     n_runs = 50
 
     function try_method(method)
         wrapper(d) = experiment(d, method)
-        return reduce(hcat, map((x) -> map(wrapper, dimensionalities), 1:n_runs))
+        return reduce(hcat, map((x) -> map(wrapper, ds), 1:n_runs))
     end
 
     errs = map(try_method, methods)
