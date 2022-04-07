@@ -86,7 +86,7 @@ function DynamicParams(; η, M, β)
     return DynamicParams(η, M, β)
 end
 
-function synthetic(method=:original)
+function filtering(method=:original)
     """
         Reproducing results in section 5.3 of Kernel Bayes' Rule
         https://arxiv.org/pdf/1009.5736.pdf
