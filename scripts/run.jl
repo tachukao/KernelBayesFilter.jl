@@ -34,6 +34,9 @@ function toy()
         # draw data
         n_prior_samples = 200
         n_train_samples = n_prior_samples
+        # prior weights
+        wu = ones(n_prior_samples) / n_prior_samples
+        # prior samples
         U = rand(prior, n_prior_samples)
         D = rand(joint, n_train_samples)
         X = D[1:d, :]
@@ -43,17 +46,18 @@ function toy()
         Ytest = Dtest[(d + 1):end, :] .- 1.0
         target = f(Ytest)
 
-        return U, X, Y, Ytest, target
+        return wu, U, X, Y, Ytest, target
     end
 
     function experiment(d, method)
-        U, X, Y, Ytest, target = problem(d)
-        inferred = method(U, X, Y; ϵ=0.2)(Ytest)
+        wu, U, X, Y, Ytest, target = problem(d)
+        inferred_weights = kbr(wu, U, X, Y; ϵ=0.2, method)(Ytest)
+        inferred = X * inferred_weights
         return mse(inferred, target)
     end
 
     ds = 2 .^ (1:6)
-    methods = [kernel_bayes, iw_kernel_bayes]
+    methods = [:original, :iw]
     n_runs = 50
 
     function try_method(method)
@@ -82,7 +86,7 @@ function DynamicParams(; η, M, β)
     return DynamicParams(η, M, β)
 end
 
-function synthetic()
+function synthetic(method=:original)
     """
         Reproducing results in section 5.3 of Kernel Bayes' Rule
         https://arxiv.org/pdf/1009.5736.pdf
@@ -141,7 +145,7 @@ function synthetic()
 
     Xtrain, Ytrain = sample(params, x0, Ttrain; σx=σ, σy=σ)
     Xtest, Ytest = sample(params, x0, Ttest; σx=σ, σy=σ)
-    Xfiltered = kernel_bayes_filter(Xtrain, Ytrain, Ytest; ϵ, δ)
+    Xfiltered = kbf(Xtrain, Ytrain, Ytest; ϵ, δ, method)
     nX, _ = sample(demo_params, x0, Ttest; σx=0.0, σy=0.0)
 
     fig = plot(; legend=:topleft, size=(450, 450))
@@ -149,7 +153,7 @@ function synthetic()
     scatter!(Xfiltered[1, 1:end], Xfiltered[2, 1:end]; label="filtered")
     scatter!(Xtest[1, :], Xtest[2, :]; label="true")
     display(fig)
-    println(mse(Xfiltered, Xtest))
+    println("$(String(method)): MSE=$(mse(Xfiltered, Xtest))")
 
     return nothing
 end

@@ -14,52 +14,61 @@ function median_lengthscale(X)
     return median_lengthscale(X, X)
 end
 
-function compute_gamma(U, X, KX, ϵ)
+function propagate(weights, U, X, KX, ϵ)
     n = size(X)[2]
     GX = kernelmatrix(KX, X)
-    m = mean(kernelmatrix(KX, X, U); dims=2)
-    γ = ((GX + n * ϵ * I(n)) \ m)
-    return γ[:, 1]
+    m = kernelmatrix(KX, X, U) * weights
+    new_weights = ((GX + n * ϵ * I(n)) \ m)
+    return new_weights
 end
 
-function kernel_bayes(
-    U,
-    X,
-    Y;
-    ϵ=0.2,
-    KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)),
-    KY=with_lengthscale(SqExponentialKernel(), median_lengthscale(Y)),
-)::Function
-    n = size(X)[2]
-    GY = kernelmatrix(KY, Y)
-    γ = compute_gamma(U, X, KX, ϵ)
-    D = Diagonal(γ)
+function original_update(γ, Y, KY; ϵ, GY=kernelmatrix(KY, Y))
+    n = size(Y)[2]
+    D = Diagonal(γ[:])
     A = D * GY
     R = A * ((A * A + ϵ * I(n)) \ D)
     # posterior mean
-    f(Ytest) = X * R * kernelmatrix(KY, Y, Ytest)
+    f(Ytest) = R * kernelmatrix(KY, Y, Ytest)
     return f
 end
 
-function iw_kernel_bayes(
+function iw_update(γ, Y, KY; ϵ, GY=kernelmatrix(KY, Y))
+    n = size(Y)[2]
+    D = Diagonal(sqrt.(max.(γ[:], 0.0)))
+    R = D * ((D * GY * D + ϵ * I(n)) \ D)
+    # posterior mean
+    f(Ytest) = R * kernelmatrix(KY, Y, Ytest)
+    return f
+end
+
+function select_update(method)
+    if method == :original
+        return original_update
+    elseif method == :iw
+        return iw_update
+    else
+        throw(error("Method must be either :original or :iw"))
+    end
+end
+
+"""
+    Kernel Bayes' Rule
+"""
+function kbr(
+    wu,
     U,
     X,
     Y;
     ϵ=0.2,
     KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)),
     KY=with_lengthscale(SqExponentialKernel(), median_lengthscale(Y)),
-)::Function
-    n = size(X)[2]
-    GY = kernelmatrix(KY, Y)
-    γ = compute_gamma(U, X, KX, ϵ)
-    D = Diagonal(sqrt.(max.(γ, 0.0))) / n
-    R = D * ((D * GY * D + ϵ * I(n)) \ D)
-    # posterior mean
-    f(Ytest) = X * R * kernelmatrix(KY, Y, Ytest)
-    return f
+    method=:original,
+)
+    γ = propagate(wu, U, X, KX, ϵ)
+    return select_update(method)(γ, Y, KY; ϵ)
 end
 
-function _prediction_matrix(
+function _transition_kernel(
     X; KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)), ϵ
 )
     T = size(X)[2]
@@ -71,17 +80,10 @@ function _prediction_matrix(
     return L * GX_ * L * GX
 end
 
-function _posterior(μ, KY, GY, Y, y; δ)
-    T = size(Y)[2]
-    D = Diagonal(μ)
-    A = D * GY
-    ky = kernelmatrix(KY, Y, reshape(y, (length(y), 1)))
-    R = (A * A + δ * I(T))
-    α = A * (R \ (D * ky))
-    return α[:, 1]
-end
-
-function kernel_bayes_filter(
+"""
+    Kernel Bayes' Filter
+"""
+function kbf(
     X,
     Y,
     Ytest;
@@ -89,27 +91,28 @@ function kernel_bayes_filter(
     δ,
     KX=with_lengthscale(SqExponentialKernel(), median_lengthscale(X)),
     KY=with_lengthscale(SqExponentialKernel(), median_lengthscale(Y)),
+    method=:original,
 )
     T = size(Y)[2]
     Ttest = size(Ytest)[2]
-    P = _prediction_matrix(X; ϵ, KX)
+    update = select_update(method)
+
+    P = _transition_kernel(X; ϵ, KX)
     GY = kernelmatrix(KY, Y[:, 1:(T - 1)])
     Xf = zeros(size(X)[1], Ttest)
-    ytest1 = reshape(Ytest[:, 1], (size(Ytest)[1], 1))
-    kyt = kernelmatrix(KY, Y[:, 1:(T - 1)], ytest1)[:]
-    α = (GY + T * ϵ * I(T - 1)) \ kyt
+    kyt = kernelmatrix(KY, Y[:, 1:(T - 1)], Ytest[:, [1]])
+    α = (GY + (T - 1) * ϵ * I(T - 1)) \ kyt
     Xf[:, 1] = X[:, 1:(T - 1)] * α
 
     for t in 2:Ttest
         μ = P * α
-        α = _posterior(μ, KY, GY, Y[:, 1:(T - 1)], Ytest[:, t]; δ)
+        α = update(μ, Y[:, 1:(T - 1)], KY; ϵ=δ, GY)(Ytest[:, [t]])
         Xf[:, t] = X[:, 1:(T - 1)] * α
     end
 
     return Xf
 end
 
-export median_lengthscale, kernel_bayes, iw_kernel_bayes
-export kernel_bayes_filter
+export median_lengthscale, kbr, kbf
 
 end
