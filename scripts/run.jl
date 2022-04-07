@@ -3,6 +3,7 @@ using Distributions
 using Plots
 using LinearAlgebra
 using KernelBayesFilter
+using KernelFunctions
 
 function mse(x, y)
     return mean(sum((x - y) .^ 2; dims=1))
@@ -47,7 +48,7 @@ function toy()
 
     function experiment(d, method)
         U, X, Y, Ytest, target = problem(d)
-        inferred = method(U, X, Y; ϵ=0.2)(Ytest)
+        inferred = method(U, X, Y; ϵ=0.8)(Ytest)
         return mse(inferred, target)
     end
 
@@ -62,12 +63,93 @@ function toy()
 
     errs = map(try_method, methods)
 
-    fig = plot(; legend=:topleft)
+    fig = plot(; legend=:topleft, size=(400, 400))
     scatter!(ds, mean(errs[1]; dims=2); ribbon=std(errs[1]; dims=2), label="original")
     scatter!(ds, mean(errs[2]; dims=2); ribbon=std(errs[2]; dims=2), label="IW")
     ylabel!("MSE")
     xlabel!("dimensionality")
     display(fig)
+
+    return nothing
+end
+
+struct DynamicParams
+    η::Float64
+    M::Float64
+    β::Float64
+end
+function DynamicParams(; η, M, β)
+    return DynamicParams(η, M, β)
+end
+
+function synthetic()
+    """
+        Reproducing results in section 5.3 of Kernel Bayes' Rule
+        https://arxiv.org/pdf/1009.5736.pdf
+    """
+    function f(p::DynamicParams, x)
+        u = x[1]
+        v = x[2]
+        denom = sqrt(u^2 + v^2)
+        c = u / denom
+        s = v / denom
+        nc = cos(p.η) * c - sin(p.η) * s
+        ns = sin(p.η) * c + cos(p.η) * s
+
+        rotation = [nc -ns; ns nc]
+        coef = p.β * (rotation^p.M)[2, 1]
+        nx = (1 + coef) * [nc; ns]
+        return nx
+    end
+
+    function observe(x, σy)
+        return x + σy * randn(size(x))
+    end
+
+    function dynamics(p::DynamicParams, x, σx)
+        return f(p, x) + σx * randn(size(x))
+    end
+
+    function sample(p::DynamicParams, x0, T; σx, σy)
+        xs = zeros(length(x0), T)
+        ys = zeros(length(x0), T)
+        xs[:, 1] = x0
+        ys[:, 1] = observe(x0, σy)
+        x = x0
+        for t in 2:T
+            x = dynamics(p, x, σx)
+            xs[:, t] = x
+            ys[:, t] = observe(x, σy)
+        end
+        return xs, ys
+    end
+
+    params1 = DynamicParams(; η=0.3, M=1.0, β=0.0)
+    demo_params1 = DynamicParams(; η=0.05, M=1.0, β=0.0)
+    params2 = DynamicParams(; η=0.4, M=8.0, β=0.4)
+    demo_params2 = DynamicParams(; η=0.05, M=8.0, β=0.4)
+
+    params = params2
+    demo_params = demo_params2
+
+    x0 = [1.0; 0.0]
+    σ = 0.2
+    ϵ = 1e-5
+    δ = ϵ * 2.0
+    Ttrain = 500
+    Ttest = 200
+
+    Xtrain, Ytrain = sample(params, x0, Ttrain; σx=σ, σy=σ)
+    Xtest, Ytest = sample(params, x0, Ttest; σx=σ, σy=σ)
+    Xfiltered = kernel_bayes_filter(Xtrain, Ytrain, Ytest; ϵ, δ)
+    nX, _ = sample(demo_params, x0, Ttest; σx=0.0, σy=0.0)
+
+    fig = plot(; legend=:topleft, size=(450, 450))
+    plot!(nX[1, :], nX[2, :]; label="trajectory")
+    scatter!(Xfiltered[1, 1:end], Xfiltered[2, 1:end]; label="filtered")
+    scatter!(Xtest[1, :], Xtest[2, :]; label="true")
+    display(fig)
+    println(mse(Xfiltered, Xtest))
 
     return nothing
 end
