@@ -48,7 +48,7 @@ function toy()
 
     function experiment(d, method)
         U, X, Y, Ytest, target = problem(d)
-        inferred = method(U, X, Y; ϵ=0.8)(Ytest)
+        inferred = method(U, X, Y; ϵ=0.2)(Ytest)
         return mse(inferred, target)
     end
 
